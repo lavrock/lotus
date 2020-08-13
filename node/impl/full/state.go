@@ -1114,9 +1114,6 @@ func (a *StateAPI) StateVerifiedClientStatus(ctx context.Context, addr address.A
 	return &dcap, nil
 }
 
-var dealProviderCollateralNum = types.NewInt(110)
-var dealProviderCollateralDen = types.NewInt(100)
-
 // StateDealProviderCollateralBounds returns the min and max collateral a storage provider
 // can issue. It takes the deal size and verified status as parameters.
 func (a *StateAPI) StateDealProviderCollateralBounds(ctx context.Context, size abi.PaddedPieceSize, verified bool, tsk types.TipSetKey) (api.DealCollateralBounds, error) {
@@ -1151,7 +1148,7 @@ func (a *StateAPI) StateDealProviderCollateralBounds(ctx context.Context, size a
 
 	min, max := market.DealProviderCollateralBounds(size, verified, powerState.ThisEpochQualityAdjPower, rewardState.ThisEpochBaselinePower, circ)
 	return api.DealCollateralBounds{
-		Min: types.BigDiv(types.BigMul(min, dealProviderCollateralNum), dealProviderCollateralDen),
+		Min: min,
 		Max: max,
 	}, nil
 }

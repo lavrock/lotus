@@ -224,13 +224,22 @@ func (c *ClientNodeAdapter) ValidatePublishedDeal(ctx context.Context, deal stor
 	return res.IDs[dealIdx], nil
 }
 
-func (c *ClientNodeAdapter) DealProviderCollateralBounds(ctx context.Context, size abi.PaddedPieceSize, isVerified bool) (abi.TokenAmount, abi.TokenAmount, error) {
+func (c *ClientNodeAdapter) DealProviderCollateralBounds(ctx context.Context, size abi.PaddedPieceSize, isVerified bool, pct uint) (abi.TokenAmount, abi.TokenAmount, error) {
 	bounds, err := c.StateDealProviderCollateralBounds(ctx, size, isVerified, types.EmptyTSK)
 	if err != nil {
 		return abi.TokenAmount{}, abi.TokenAmount{}, err
 	}
 
-	return bounds.Min, bounds.Max, nil
+	// returns (a * pct) /100
+	calcPct := func(a abi.TokenAmount) abi.TokenAmount {
+		return types.BigDiv(types.BigMul(a, types.NewInt(uint64(pct))), types.NewInt(100))
+	}
+
+	minAdj := types.BigAdd(bounds.Min, calcPct(bounds.Min))
+	// TODO: For when we have max
+	//maxAdj := types.BigSub(bounds.Max, calcPct(bounds.Max))
+
+	return minAdj, bounds.Max, nil
 }
 
 func (c *ClientNodeAdapter) OnDealSectorCommitted(ctx context.Context, provider address.Address, dealId abi.DealID, cb storagemarket.DealSectorCommittedCallback) error {
