@@ -12,6 +12,7 @@ import (
 
 	"github.com/docker/go-units"
 	"github.com/fatih/color"
+	"github.com/filecoin-project/go-fil-markets/retrievalmarket"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-cidutil/cidenc"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -173,7 +174,7 @@ var clientDropCmd = &cli.Command{
 var clientCommPCmd = &cli.Command{
 	Name:      "commP",
 	Usage:     "Calculate the piece-cid (commP) of a CAR file",
-	ArgsUsage: "[inputFile minerAddress]",
+	ArgsUsage: "[inputFile]",
 	Flags: []cli.Flag{
 		&CidBaseFlag,
 	},
@@ -185,16 +186,11 @@ var clientCommPCmd = &cli.Command{
 		defer closer()
 		ctx := ReqContext(cctx)
 
-		if cctx.Args().Len() != 2 {
-			return fmt.Errorf("usage: commP <inputPath> <minerAddr>")
+		if cctx.Args().Len() != 1 {
+			return fmt.Errorf("usage: commP <inputPath>")
 		}
 
-		miner, err := address.NewFromString(cctx.Args().Get(1))
-		if err != nil {
-			return err
-		}
-
-		ret, err := api.ClientCalcCommP(ctx, cctx.Args().Get(0), miner)
+		ret, err := api.ClientCalcCommP(ctx, cctx.Args().Get(0))
 		if err != nil {
 			return err
 		}
@@ -837,12 +833,33 @@ var clientRetrieveCmd = &cli.Command{
 			Path:  cctx.Args().Get(1),
 			IsCAR: cctx.Bool("car"),
 		}
-		if err := fapi.ClientRetrieve(ctx, offer.Order(payer), ref); err != nil {
-			return xerrors.Errorf("Retrieval Failed: %w", err)
+		updates, err := fapi.ClientRetrieve(ctx, offer.Order(payer), ref)
+		if err != nil {
+			return xerrors.Errorf("error setting up retrieval: %w", err)
 		}
 
-		fmt.Println("Success")
-		return nil
+		for {
+			select {
+			case evt, chOpen := <-updates:
+				fmt.Printf("> Recv: %s, Paid %s, %s (%s)\n",
+					types.SizeStr(types.NewInt(evt.BytesReceived)),
+					types.FIL(evt.FundsSpent),
+					retrievalmarket.ClientEvents[evt.Event],
+					retrievalmarket.DealStatuses[evt.Status],
+				)
+
+				if !chOpen {
+					fmt.Println("Success")
+					return nil
+				}
+
+				if evt.Err != "" {
+					return xerrors.Errorf("retrieval failed: %v", err)
+				}
+			case <-ctx.Done():
+				return xerrors.Errorf("retrieval timed out")
+			}
+		}
 	},
 }
 
@@ -909,6 +926,7 @@ var clientQueryAskCmd = &cli.Command{
 
 		fmt.Printf("Ask: %s\n", maddr)
 		fmt.Printf("Price per GiB: %s\n", types.FIL(ask.Ask.Price))
+		fmt.Printf("Verified Price per GiB: %s\n", types.FIL(ask.Ask.VerifiedPrice))
 		fmt.Printf("Max Piece size: %s\n", types.SizeStr(types.NewInt(uint64(ask.Ask.MaxPieceSize))))
 
 		size := cctx.Int64("size")

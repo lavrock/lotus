@@ -3,6 +3,7 @@ package storage
 import (
 	"bytes"
 	"context"
+	"github.com/filecoin-project/lotus/api"
 
 	"github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
@@ -237,19 +238,16 @@ func (s SealingAPIAdapter) StateMarketStorageDeal(ctx context.Context, dealID ab
 	return deal.Proposal, nil
 }
 
-//TODO: rename/remove gasPrice and gasLimit
-func (s SealingAPIAdapter) SendMsg(ctx context.Context, from, to address.Address, method abi.MethodNum, value, gasPrice big.Int, gasLimit int64, params []byte) (cid.Cid, error) {
+func (s SealingAPIAdapter) SendMsg(ctx context.Context, from, to address.Address, method abi.MethodNum, value, maxFee abi.TokenAmount, params []byte) (cid.Cid, error) {
 	msg := types.Message{
-		To:         to,
-		From:       from,
-		Value:      value,
-		GasPremium: gasPrice,
-		GasLimit:   gasLimit,
-		Method:     method,
-		Params:     params,
+		To:     to,
+		From:   from,
+		Value:  value,
+		Method: method,
+		Params: params,
 	}
 
-	smsg, err := s.delegate.MpoolPushMessage(ctx, &msg)
+	smsg, err := s.delegate.MpoolPushMessage(ctx, &msg, &api.MessageSendSpec{MaxFee: maxFee})
 	if err != nil {
 		return cid.Undef, err
 	}
@@ -266,13 +264,22 @@ func (s SealingAPIAdapter) ChainHead(ctx context.Context) (sealing.TipSetToken, 
 	return head.Key().Bytes(), head.Height(), nil
 }
 
-func (s SealingAPIAdapter) ChainGetRandomness(ctx context.Context, tok sealing.TipSetToken, personalization crypto.DomainSeparationTag, randEpoch abi.ChainEpoch, entropy []byte) (abi.Randomness, error) {
+func (s SealingAPIAdapter) ChainGetRandomnessFromBeacon(ctx context.Context, tok sealing.TipSetToken, personalization crypto.DomainSeparationTag, randEpoch abi.ChainEpoch, entropy []byte) (abi.Randomness, error) {
 	tsk, err := types.TipSetKeyFromBytes(tok)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.delegate.ChainGetRandomness(ctx, tsk, personalization, randEpoch, entropy)
+	return s.delegate.ChainGetRandomnessFromBeacon(ctx, tsk, personalization, randEpoch, entropy)
+}
+
+func (s SealingAPIAdapter) ChainGetRandomnessFromTickets(ctx context.Context, tok sealing.TipSetToken, personalization crypto.DomainSeparationTag, randEpoch abi.ChainEpoch, entropy []byte) (abi.Randomness, error) {
+	tsk, err := types.TipSetKeyFromBytes(tok)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.delegate.ChainGetRandomnessFromTickets(ctx, tsk, personalization, randEpoch, entropy)
 }
 
 func (s SealingAPIAdapter) ChainReadObj(ctx context.Context, ocid cid.Cid) ([]byte, error) {

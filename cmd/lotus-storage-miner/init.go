@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"github.com/filecoin-project/specs-actors/actors/abi/big"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -437,7 +438,13 @@ func storageMinerInit(ctx context.Context, cctx *cli.Context, api lapi.FullNode,
 
 			smgr, err := sectorstorage.New(ctx, lr, stores.NewIndex(), &ffiwrapper.Config{
 				SealProofType: spt,
-			}, sectorstorage.SealerConfig{10, true, true, true, true}, nil, sa)
+			}, sectorstorage.SealerConfig{
+				ParallelFetchLimit: 10,
+				AllowPreCommit1:    true,
+				AllowPreCommit2:    true,
+				AllowCommit:        true,
+				AllowUnseal:        true,
+			}, nil, sa)
 			if err != nil {
 				return err
 			}
@@ -560,7 +567,7 @@ func configureStorageMiner(ctx context.Context, api lapi.FullNode, addr address.
 		GasPremium: gasPrice,
 	}
 
-	smsg, err := api.MpoolPushMessage(ctx, msg)
+	smsg, err := api.MpoolPushMessage(ctx, msg, nil)
 	if err != nil {
 		return err
 	}
@@ -608,11 +615,6 @@ func createStorageMiner(ctx context.Context, api lapi.FullNode, peerid peer.ID, 
 		return address.Undef, err
 	}
 
-	collateral, err := api.StatePledgeCollateral(ctx, types.EmptyTSK)
-	if err != nil {
-		return address.Undef, err
-	}
-
 	spt, err := ffiwrapper.SealProofTypeFromSectorSize(abi.SectorSize(ssize))
 	if err != nil {
 		return address.Undef, err
@@ -631,7 +633,7 @@ func createStorageMiner(ctx context.Context, api lapi.FullNode, peerid peer.ID, 
 	createStorageMinerMsg := &types.Message{
 		To:    builtin.StoragePowerActorAddr,
 		From:  owner,
-		Value: types.BigAdd(collateral, types.BigDiv(collateral, types.NewInt(100))),
+		Value: big.Zero(),
 
 		Method: builtin.MethodsPower.CreateMiner,
 		Params: params,
@@ -640,7 +642,7 @@ func createStorageMiner(ctx context.Context, api lapi.FullNode, peerid peer.ID, 
 		GasPremium: gasPrice,
 	}
 
-	signed, err := api.MpoolPushMessage(ctx, createStorageMinerMsg)
+	signed, err := api.MpoolPushMessage(ctx, createStorageMinerMsg, nil)
 	if err != nil {
 		return address.Undef, err
 	}

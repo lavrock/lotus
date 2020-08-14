@@ -23,6 +23,7 @@ import (
 
 	"github.com/filecoin-project/sector-storage/ffiwrapper"
 	"github.com/filecoin-project/specs-actors/actors/abi"
+	"github.com/filecoin-project/specs-actors/actors/abi/big"
 	"github.com/filecoin-project/specs-actors/actors/builtin"
 	"github.com/filecoin-project/specs-actors/actors/builtin/power"
 
@@ -279,7 +280,7 @@ func (h *handler) send(w http.ResponseWriter, r *http.Request) {
 		Value: types.BigInt(h.sendPerRequest),
 		From:  h.from,
 		To:    to,
-	})
+	}, nil)
 	if err != nil {
 		w.WriteHeader(400)
 		_, _ = w.Write([]byte(err.Error()))
@@ -339,18 +340,11 @@ func (h *handler) mkminer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	collateral, err := h.api.StatePledgeCollateral(r.Context(), types.EmptyTSK)
-	if err != nil {
-		w.WriteHeader(400)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
 	smsg, err := h.api.MpoolPushMessage(h.ctx, &types.Message{
 		Value: types.BigInt(h.sendPerRequest),
 		From:  h.from,
 		To:    owner,
-	})
+	}, nil)
 	if err != nil {
 		w.WriteHeader(400)
 		w.Write([]byte("pushfunds: " + err.Error()))
@@ -380,13 +374,13 @@ func (h *handler) mkminer(w http.ResponseWriter, r *http.Request) {
 	createStorageMinerMsg := &types.Message{
 		To:    builtin.StoragePowerActorAddr,
 		From:  h.from,
-		Value: types.BigAdd(collateral, types.BigDiv(collateral, types.NewInt(100))),
+		Value: big.Zero(),
 
 		Method: builtin.MethodsPower.CreateMiner,
 		Params: params,
 	}
 
-	signed, err := h.api.MpoolPushMessage(r.Context(), createStorageMinerMsg)
+	signed, err := h.api.MpoolPushMessage(r.Context(), createStorageMinerMsg, nil)
 	if err != nil {
 		w.WriteHeader(400)
 		w.Write([]byte(err.Error()))

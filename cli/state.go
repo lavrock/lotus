@@ -52,7 +52,6 @@ var stateCmd = &cli.Command{
 		statePowerCmd,
 		stateSectorsCmd,
 		stateActiveSectorsCmd,
-		statePledgeCollateralCmd,
 		stateListActorsCmd,
 		stateListMinersCmd,
 		stateCircSupplyCmd,
@@ -382,33 +381,6 @@ var stateReplaySetCmd = &cli.Command{
 			fmt.Printf("Error message: %q\n", res.Error)
 		}
 
-		return nil
-	},
-}
-
-var statePledgeCollateralCmd = &cli.Command{
-	Name:  "pledge-collateral",
-	Usage: "Get minimum miner pledge collateral",
-	Action: func(cctx *cli.Context) error {
-		api, closer, err := GetFullNodeAPI(cctx)
-		if err != nil {
-			return err
-		}
-		defer closer()
-
-		ctx := ReqContext(cctx)
-
-		ts, err := LoadTipSet(ctx, cctx, api)
-		if err != nil {
-			return err
-		}
-
-		coll, err := api.StatePledgeCollateral(ctx, ts.Key())
-		if err != nil {
-			return err
-		}
-
-		fmt.Println(types.FIL(coll))
 		return nil
 	},
 }
@@ -858,7 +830,7 @@ var stateComputeStateCmd = &cli.Command{
 
 		var msgs []*types.Message
 		if cctx.Bool("apply-mpool-messages") {
-			pmsgs, err := api.MpoolSelect(ctx, ts.Key())
+			pmsgs, err := api.MpoolSelect(ctx, ts.Key(), 1)
 			if err != nil {
 				return err
 			}
@@ -913,6 +885,7 @@ func printInternalExecutions(prefix string, trace []types.ExecutionTrace) {
 var compStateTemplate = `
 <html>
  <head>
+  <meta charset="UTF-8">
   <style>
    html, body { font-family: monospace; }
    a:link, a:visited { color: #004; }

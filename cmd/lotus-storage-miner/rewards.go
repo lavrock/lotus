@@ -5,11 +5,12 @@ import (
 
 	"github.com/urfave/cli/v2"
 
+	"github.com/filecoin-project/specs-actors/actors/builtin"
+	"github.com/filecoin-project/specs-actors/actors/builtin/miner"
+
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
-	"github.com/filecoin-project/specs-actors/actors/builtin"
-	"github.com/filecoin-project/specs-actors/actors/builtin/miner"
 )
 
 var rewardsCmd = &cli.Command{
@@ -53,7 +54,7 @@ var rewardsRedeemCmd = &cli.Command{
 		}
 
 		params, err := actors.SerializeParams(&miner.WithdrawBalanceParams{
-			mact.Balance, // Default to attempting to withdraw all the extra funds in the miner actor
+			AmountRequested: mact.Balance, // Default to attempting to withdraw all the extra funds in the miner actor
 		})
 		if err != nil {
 			return err
@@ -65,7 +66,7 @@ var rewardsRedeemCmd = &cli.Command{
 			Value:  types.NewInt(0),
 			Method: builtin.MethodsMiner.WithdrawBalance,
 			Params: params,
-		})
+		}, nil)
 		if err != nil {
 			return err
 		}

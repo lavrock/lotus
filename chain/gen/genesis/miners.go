@@ -57,18 +57,18 @@ func mkFakedSigSyscalls(base vm.SyscallBuilder) vm.SyscallBuilder {
 }
 
 func SetupStorageMiners(ctx context.Context, cs *store.ChainStore, sroot cid.Cid, miners []genesis.Miner) (cid.Cid, error) {
-	vc := func(context.Context, abi.ChainEpoch) (abi.TokenAmount, error) {
+	csc := func(context.Context, abi.ChainEpoch, *state.StateTree) (abi.TokenAmount, error) {
 		return big.Zero(), nil
 	}
 
 	vmopt := &vm.VMOpts{
-		StateBase:  sroot,
-		Epoch:      0,
-		Rand:       &fakeRand{},
-		Bstore:     cs.Blockstore(),
-		Syscalls:   mkFakedSigSyscalls(cs.VMSys()),
-		VestedCalc: vc,
-		BaseFee:    types.NewInt(0),
+		StateBase:      sroot,
+		Epoch:          0,
+		Rand:           &fakeRand{},
+		Bstore:         cs.Blockstore(),
+		Syscalls:       mkFakedSigSyscalls(cs.VMSys()),
+		CircSupplyCalc: csc,
+		BaseFee:        types.NewInt(0),
 	}
 
 	vm, err := vm.NewVM(vmopt)
@@ -318,7 +318,13 @@ func SetupStorageMiners(ctx context.Context, cs *store.ChainStore, sroot cid.Cid
 // TODO: copied from actors test harness, deduplicate or remove from here
 type fakeRand struct{}
 
-func (fr *fakeRand) GetRandomness(ctx context.Context, personalization crypto.DomainSeparationTag, randEpoch abi.ChainEpoch, entropy []byte) ([]byte, error) {
+func (fr *fakeRand) GetChainRandomness(ctx context.Context, personalization crypto.DomainSeparationTag, randEpoch abi.ChainEpoch, entropy []byte) ([]byte, error) {
+	out := make([]byte, 32)
+	_, _ = rand.New(rand.NewSource(int64(randEpoch * 1000))).Read(out)
+	return out, nil
+}
+
+func (fr *fakeRand) GetBeaconRandomness(ctx context.Context, personalization crypto.DomainSeparationTag, randEpoch abi.ChainEpoch, entropy []byte) ([]byte, error) {
 	out := make([]byte, 32)
 	_, _ = rand.New(rand.NewSource(int64(randEpoch))).Read(out)
 	return out, nil
